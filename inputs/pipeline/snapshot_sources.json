@@ -1,0 +1,149 @@
+{
+  "scope": "Evidence recovered from the uploaded repository; missing historical records remain unknown.",
+  "historical_raw_files": [
+    {
+      "filename": "human_lcrs.csv",
+      "source": "LCRAnnotationsDB human-protein API response",
+      "status": "not present in upload",
+      "retrieved_at_utc": null,
+      "sha256": null
+    },
+    {
+      "filename": "oma-uniprot.txt.gz",
+      "source": "OMA bulk release",
+      "status": "not present in upload",
+      "retrieved_at_utc": null,
+      "sha256": null
+    },
+    {
+      "filename": "oma-groups.txt.gz",
+      "source": "OMA bulk release",
+      "status": "not present in upload",
+      "retrieved_at_utc": null,
+      "sha256": null
+    },
+    {
+      "filename": "oma-seqs.fa.gz",
+      "source": "OMA bulk release",
+      "status": "not present in upload",
+      "retrieved_at_utc": null,
+      "sha256": null
+    }
+  ],
+  "release_declarations_from_user_readme": {
+    "uniprot": "2026_01",
+    "oma": "All.Jul2024 (31st release)",
+    "verification": "Not independently established by the uploaded scripts or CSVs."
+  },
+  "original_uploaded_archive": {
+    "filename": "low-complexity-proteins-database.zip",
+    "size_bytes": 221478940,
+    "sha256": "6854e48ce00fe28694c1af403f4ec8958a1e6285f0f953478e89a9feb711da4e"
+  },
+  "historical_code": [
+    {
+      "filename": "seed_lcrs.py",
+      "size_bytes": 20283,
+      "sha256": "4ac4d18c4395b41df75611832d253f105cf2d483e582f441275a7a2d483d7201",
+      "original_path": "pipeline/seed_lcrs.py"
+    },
+    {
+      "filename": "seed_orthologs_bulk.py",
+      "size_bytes": 9453,
+      "sha256": "2b6dc0bcdaa42d6b380e7a328a1209685726476e220fd0b31a93b5d4f87b1033",
+      "original_path": "pipeline/seed_orthologs_bulk.py"
+    },
+    {
+      "filename": "anchor_map.py",
+      "size_bytes": 16177,
+      "sha256": "7c32ef140d36754a8cda83f7fc2dceb0d7eca6f60082053c6c22d204bc17df97",
+      "original_path": "pipeline/anchor_map.py"
+    },
+    {
+      "filename": "config.py",
+      "size_bytes": 1671,
+      "sha256": "006cc9bf18e144f4c5c616aa2f5043d5683f226e862a8650d4741a544ba67e8c",
+      "original_path": "pipeline/config.py"
+    }
+  ],
+  "available_snapshot_variants": [
+    {
+      "variant": "original_table_exports",
+      "files": [
+        {
+          "filename": "protein.csv",
+          "size_bytes": 94449036,
+          "sha256": "2cba676c0aabcda67cb52916b4ff54da12cb9074755b04337f840431e63ddc86"
+        },
+        {
+          "filename": "lcr_seq.csv",
+          "size_bytes": 57566978,
+          "sha256": "8c5c696933cf55aaf9ba1957e6f63403c72be8e4736a0589ad120c639f70cab6"
+        },
+        {
+          "filename": "lcr_family.csv",
+          "size_bytes": 1999018,
+          "sha256": "0704a6e44b54cc4d3b27cdb116739c43d0497fb78952c745d2f9e9cd12f6a795"
+        },
+        {
+          "filename": "phylogeny_map.csv",
+          "size_bytes": 33083413,
+          "sha256": "3194f87bbea4fcac78289861a9fa2957bc174f713e8889838d01a57598da2701"
+        }
+      ]
+    },
+    {
+      "variant": "cleaned_inputs",
+      "files": [
+        {
+          "filename": "protein.csv",
+          "size_bytes": 94588300,
+          "sha256": "ca1e7d3305d2e8635c4d2f594ff5ca0361dc115ca23cfc0ad947f270110c954d"
+        },
+        {
+          "filename": "lcr_seq.csv",
+          "size_bytes": 26272221,
+          "sha256": "1ca9ac5823387c22b32aac8a6c77df590b0d744503123d81fb4ac65618fb271c"
+        },
+        {
+          "filename": "lcr_family.csv",
+          "size_bytes": 1612890,
+          "sha256": "5f520c963289d58d9f04da99264198f1f8f83528aa40fe879b019435a6f96bf6"
+        },
+        {
+          "filename": "phylogeny_map.csv",
+          "size_bytes": 6703758,
+          "sha256": "0f87ebe7854a5ef4fd48739e837a926f434093dc3855c684b35e00f8b5fb7c6d"
+        }
+      ]
+    }
+  ],
+  "historical_api_endpoint": "https://lcrannotdb.lcr-lab.org/api/proteins/",
+  "notes": [
+    "The original scripts and table exports document an implemented method, not a complete run history.",
+    "The original_table_exports variant has the original column layout; cleaned_inputs separates OMA IDs and records coordinate conventions.",
+    "Use the variant matching the actual local files when checking hashes."
+  ],
+  "new_upstream_code": [
+    {
+      "filename": "fetch_human_lcrs.py",
+      "size_bytes": 2323,
+      "sha256": "2c34820056800eef2e494879fe9a032255abe18087503aac4cae562589223347"
+    },
+    {
+      "filename": "prepare_inputs.py",
+      "size_bytes": 1595,
+      "sha256": "a3f39528e03c068c71e70edf8fb3ca418a57349c14f6d769812c8df06190fc60"
+    },
+    {
+      "filename": "upstream.py",
+      "size_bytes": 14555,
+      "sha256": "6802eb723812ab9a195ae7694ff1a137762c833bbfecb78678abaa8a0f5815cf"
+    }
+  ],
+  "validation": {
+    "python_version": "3.12.14",
+    "checks_passed": 33,
+    "scope": "Synthetic raw CSV/GZIP preparation, mocked HTTP responses and mocked alignment results. No live API request or full historical alignment reconstruction."
+  }
+}
