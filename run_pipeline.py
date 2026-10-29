@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 
 from pipeline.data import ONE_BASED, Region, load_inputs, load_mappings, read_crosswalk
-from pipeline.export import export_fastas, metadata_tables, write_metadata
+from pipeline.export import export_fastas, filter_groups, metadata_tables, write_metadata
 
 
 ROOT = Path(__file__).resolve().parent
@@ -21,6 +21,8 @@ def parser():
                                  help="restrict to a local family ID; repeat for several families")
     argument_parser.add_argument("--oma-uniprot", type=Path,
                                  help="optional local OMA-ID/UniProt TSV or TSV.gz crosswalk")
+    argument_parser.add_argument("--min-lcr-length", type=int, default=5, metavar="AA",
+                                 help="minimum source and ortholog LCR length (default: 5; 1 restores unfiltered exports)")
     argument_parser.add_argument("--overwrite", action="store_true",
                                  help="replace a previous pipeline output after successful generation")
     return argument_parser
@@ -40,6 +42,8 @@ def check_destination(inputs, output, overwrite):
 
 
 def run(args, metadata_writer=write_metadata):
+    if args.min_lcr_length < 1:
+        raise ValueError("Minimum LCR length must be at least 1")
     if args.output.is_symlink():
         raise ValueError("Output must not be a symbolic link")
     inputs, output = args.inputs.resolve(), args.output.resolve()
@@ -62,6 +66,15 @@ def run(args, metadata_writer=write_metadata):
             groups = {key: targets for key, targets in groups.items() if key[0] in selected}
     if not groups:
         raise ValueError("No anchored groups for the requested families")
+    groups, filter_counts = filter_groups(groups, regions, args.min_lcr_length)
+    print(f"Length filter >= {args.min_lcr_length} aa: "
+          f"{filter_counts['short_source_groups']:,} short-source groups removed; "
+          f"{filter_counts['short_ortholog_entries']:,} short ortholog entries removed from remaining groups; "
+          f"{filter_counts['groups_without_orthologs']:,} groups removed after losing all orthologs. "
+          f"Total removed: {filter_counts['removed_groups']:,} groups / "
+          f"{filter_counts['removed_sequence_entries']:,} sequence entries.", flush=True)
+    if not groups:
+        raise ValueError("No anchored groups remain after length filtering")
     crosswalk = read_crosswalk(args.oma_uniprot, proteins) if args.oma_uniprot else None
     output.parent.mkdir(parents=True, exist_ok=True)
     # Stage all outputs first. Errors leave an existing successful output untouched.
@@ -69,7 +82,8 @@ def run(args, metadata_writer=write_metadata):
         staged = Path(temporary) / "outputs"
         staged.mkdir()
         counts = export_fastas(staged, groups, regions, proteins)
-        tables = metadata_tables(groups, regions, proteins, crosswalk)
+        tables = metadata_tables(groups, regions, proteins, crosswalk,
+                                 min_lcr_length=args.min_lcr_length)
         print("Writing essential UniProt/OMA metadata...", flush=True)
         metadata_writer(staged / "metadata.xlsx", tables)
         backup = Path(temporary) / "previous"
@@ -84,6 +98,7 @@ def run(args, metadata_writer=write_metadata):
             raise
     counts["metadata_proteins"] = len(tables["Proteins"]["rows"])
     counts.update(rebuild_counts)
+    counts.update({f"length_filter_{name}": value for name, value in filter_counts.items()})
     print(f"Done: {counts['default_groups']:,} default / {counts['strict_groups']:,} strict groups; "
           f"{counts['metadata_proteins']:,} proteins in metadata.", flush=True)
     print(output, flush=True)
