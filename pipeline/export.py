@@ -4,6 +4,31 @@ from pathlib import Path
 from .data import ZERO_BASED
 
 
+def filter_groups(groups, regions, min_lcr_length=5):
+    """Keep the defining source and at least one ortholog, all above the length floor."""
+    if min_lcr_length < 1:
+        raise ValueError("Minimum LCR length must be at least 1")
+    retained = {}
+    counts = {"short_source_groups": 0, "short_ortholog_entries": 0,
+              "groups_without_orthologs": 0, "removed_sequence_entries": 0}
+    for key, targets in groups.items():
+        if len(regions[key[1]].sequence) < min_lcr_length:
+            counts["short_source_groups"] += 1
+            counts["removed_sequence_entries"] += 1 + len(targets)
+            continue
+        kept = {lid for lid in targets if len(regions[lid].sequence) >= min_lcr_length}
+        removed = len(targets) - len(kept)
+        counts["short_ortholog_entries"] += removed
+        counts["removed_sequence_entries"] += removed
+        if kept:
+            retained[key] = kept
+        else:
+            counts["groups_without_orthologs"] += 1
+            counts["removed_sequence_entries"] += 1
+    counts["removed_groups"] = len(groups) - len(retained)
+    return retained, counts
+
+
 def group_ids(key, targets):
     return [key[1], *sorted(targets - {key[1]})]
 
@@ -42,7 +67,7 @@ def export_fastas(directory, groups, regions, proteins):
     return {"default_groups": len(groups), "strict_groups": strict_count}
 
 
-def metadata_tables(groups, regions, proteins, crosswalk=None):
+def metadata_tables(groups, regions, proteins, crosswalk=None, min_lcr_length=None):
     """Identifiers stay text. Counts/lengths are numeric; missing identifiers stay blank."""
     by_oma, by_acc = crosswalk or ({}, {})
     group_rows, used = [], set()
@@ -69,6 +94,8 @@ def metadata_tables(groups, regions, proteins, crosswalk=None):
         "One FASTA per anchored group. Strict is a subset selected by human source mode.",
         "FASTA files contain extracted sequences, not multiple-sequence alignments.",
     ]
+    if min_lcr_length is not None:
+        notes[0] += f" Minimum LCR length: {min_lcr_length} aa for every member."
     if ZERO_BASED in systems:
         notes.append("Historical human FASTA coordinates: 0-based half-open; orthologs: 1-based inclusive.")
     else:

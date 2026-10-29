@@ -7,7 +7,7 @@ from unittest.mock import patch
 from pipeline.anchors import AnchorSettings, interval_between_anchors, rebuild, sw_hit
 from pipeline.data import (Family, ONE_BASED, ZERO_BASED, Protein, Region, load_mappings,
                            load_proteins, load_regions, read_crosswalk)
-from pipeline.export import fasta_text, metadata_tables
+from pipeline.export import fasta_text, filter_groups, metadata_tables
 from run_pipeline import check_destination, parser, run
 
 
@@ -85,6 +85,83 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(text.startswith(">fam=7|src=10|lcr=10|pid=1|species=Homo sapiens|start=30|end=40|seg=strict\n"))
         self.assertEqual(text.count(">"), 2)
         self.assertEqual(text.splitlines()[1], self.sequence[30:40])
+
+    def test_length_filter_keeps_five_aa_and_removes_four_aa_ortholog(self):
+        regions = dict(self.regions)
+        regions[20] = Region(20, 2, 1, 5, self.sequence[:5], "anchor", ONE_BASED)
+        regions[21] = Region(21, 2, 1, 4, self.sequence[:4], "anchor", ONE_BASED)
+        original = {(7, 10): {20, 21}}
+        groups, counts = filter_groups(original, regions, 5)
+        self.assertEqual(groups, {(7, 10): {20}})
+        self.assertEqual(original, {(7, 10): {20, 21}})
+        self.assertEqual(counts["short_ortholog_entries"], 1)
+        self.assertEqual(counts["removed_sequence_entries"], 1)
+
+    def test_short_source_removes_entire_group(self):
+        regions = dict(self.regions)
+        regions[10] = Region(10, 1, 0, 4, self.sequence[:4], "strict", ZERO_BASED)
+        groups, counts = filter_groups({(7, 10): {20}}, regions, 5)
+        self.assertEqual(groups, {})
+        self.assertEqual(counts["short_source_groups"], 1)
+        self.assertEqual(counts["removed_sequence_entries"], 2)
+
+    def test_length_filter_removes_group_without_remaining_orthologs(self):
+        regions = dict(self.regions)
+        regions[20] = Region(20, 2, 1, 4, self.sequence[:4], "anchor", ONE_BASED)
+        groups, counts = filter_groups({(7, 10): {20}}, regions, 5)
+        self.assertEqual(groups, {})
+        self.assertEqual(counts["groups_without_orthologs"], 1)
+        self.assertEqual(counts["removed_sequence_entries"], 2)
+
+    def test_one_aa_threshold_preserves_short_entries(self):
+        regions = dict(self.regions)
+        regions[20] = Region(20, 2, 1, 1, self.sequence[:1], "anchor", ONE_BASED)
+        original = {(7, 10): {20}}
+        groups, counts = filter_groups(original, regions, 1)
+        self.assertEqual(groups, original)
+        self.assertEqual(counts["removed_sequence_entries"], 0)
+
+    def test_invalid_length_threshold_is_rejected(self):
+        for threshold in (0, -1):
+            with self.subTest(threshold=threshold), self.assertRaisesRegex(ValueError, "at least 1"):
+                filter_groups({(7, 10): {20}}, self.regions, threshold)
+
+    def test_filtered_export_and_metadata_include_only_retained_members(self):
+        proteins = dict(self.proteins)
+        proteins[3] = Protein(3, "", "CHICK00001", "", "Chicken", self.sequence)
+        regions = dict(self.regions)
+        regions[30] = Region(30, 3, 1, 4, self.sequence[:4], "anchor", ONE_BASED)
+        args = parser().parse_args(["--inputs", str(self.root / "inputs"),
+                                    "--output", str(self.root / "outputs")])
+        captured = {}
+        def capture(path, tables):
+            captured.update(tables)
+            path.write_bytes(b"test workbook")
+        with patch("run_pipeline.load_inputs", return_value=(proteins, regions, self.families)), \
+             patch("run_pipeline.load_mappings", return_value={(7, 10): {20, 30}}):
+            counts = run(args, metadata_writer=capture)
+        default = args.output / "anchor_fastas_default" / "7_10.fasta"
+        strict = args.output / "anchor_fastas_strict" / "7_10.fasta"
+        self.assertEqual(default.read_bytes(), strict.read_bytes())
+        self.assertEqual(default.read_text().count(">"), 2)
+        self.assertNotIn("lcr=30|", default.read_text())
+        self.assertEqual(captured["Groups"]["rows"][0][4:6], [2, 2])
+        self.assertEqual({row[0] for row in captured["Proteins"]["rows"]}, {"1", "2"})
+        self.assertIn("Minimum LCR length: 5 aa", captured["Groups"]["notes"][0])
+        self.assertEqual(counts["length_filter_short_ortholog_entries"], 1)
+
+    def test_filter_removing_all_groups_preserves_existing_output(self):
+        output = self.root / "outputs"
+        output.mkdir()
+        previous = output / "metadata.xlsx"
+        previous.write_bytes(b"previous workbook")
+        args = parser().parse_args(["--inputs", str(self.root / "inputs"),
+                                    "--output", str(output), "--overwrite", "--min-lcr-length", "11"])
+        with patch("run_pipeline.load_inputs", return_value=(self.proteins, self.regions, self.families)), \
+             patch("run_pipeline.load_mappings", return_value={(7, 10): {20}}):
+            with self.assertRaisesRegex(ValueError, "No anchored groups remain"):
+                run(args)
+        self.assertEqual(previous.read_bytes(), b"previous workbook")
 
     def test_oma_ids_are_not_written_as_uniprot_accessions(self):
         path = self.csv("protein.csv", ["protein_id", "uniprot_acc", "species", "sequence"],

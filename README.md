@@ -15,8 +15,8 @@ The default run uses the supplied anchor mappings and writes exactly these outpu
 
 ```text
 outputs/
-  anchor_fastas_default/    # seg_mode=default; 59,284 groups, 59,284 FASTAs
-  anchor_fastas_strict/     # seg_mode=strict; 2,385 groups, 2,385 FASTAs
+  anchor_fastas_default/    # seg_mode=default; 59,064 groups, 59,064 FASTAs
+  anchor_fastas_strict/     # seg_mode=strict; 2,383 groups, 2,383 FASTAs
   metadata.xlsx
 ```
 
@@ -25,6 +25,29 @@ Strict refers to the human source's SEG detection mode. It does not impose a str
 Each file is named `family_id_source_lcr_id.fasta`. The first record is the human source, followed by mapped orthologs sorted by LCR ID. Identifiers and coordinates remain in the original header format.
 
 The archive already includes verified outputs, so the command above replaces them. Use `--output PATH` to write elsewhere. Existing output directories are refused unless `--overwrite` is supplied. Outputs are staged before replacement so an unsuccessful run preserves previous results. `--family 851` selects one local family; repeat the option for several families.
+
+### Minimum LCR length
+
+Exports use `--min-lcr-length 5` by default, retaining sequences of **5 aa or longer**. Filtering runs after loading or rebuilding anchor mappings and before writing FASTAs and metadata:
+
+- Exclude the entire group if its defining human source is shorter than the threshold.
+- Remove shorter ortholog entries individually; exclude groups with no remaining ortholog.
+- Preserve retained sequences, coordinates and group IDs. Apply the same rule to default and strict, keeping strict an identical subset of default.
+
+The input tables remain unchanged. The workbook records the threshold and recalculates group counts and represented proteins; the console reports exclusions. Set `--min-lcr-length 1` to reproduce unfiltered exports:
+
+```powershell
+python run_pipeline.py --min-lcr-length 1 --output outputs_unfiltered
+```
+
+For the supplied snapshot:
+
+| Collection | Groups before | Groups retained | Sequence entries before | Sequence entries retained |
+| --- | ---: | ---: | ---: | ---: |
+| Default | 59,284 | 59,064 | 373,486 | 370,041 |
+| Strict | 2,385 | 2,383 | 14,880 | 14,615 |
+
+Sequence-entry counts include group memberships. Removing a short-source group also removes its longer members. Strict is included in default, so the collections' counts must not be added together. The threshold is an inclusion rule, not validation of mapping accuracy.
 
 ## Inputs
 
